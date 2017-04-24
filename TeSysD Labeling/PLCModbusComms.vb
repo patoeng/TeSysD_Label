@@ -10,7 +10,7 @@ Imports System.Text
 Public Class PLCModbusComms
 
     Public ipPLC As String = "192.168.178.10"
-
+    'Public ipPLC As String = "127.0.0.1"
 
     Private Const c_PLCPort As Integer = 502
     Private plcIPAddress As String

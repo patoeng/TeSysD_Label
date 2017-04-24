@@ -4,6 +4,7 @@ Imports MySql.Data.MySqlClient.MySqlConnection
 Imports MySql.Data.MySqlClient
 Imports System.Printing
 Imports System.Net.Sockets
+Imports MES.Logics
 
 Public Class frmMain
 
@@ -68,6 +69,17 @@ Public Class frmMain
     Public startTime As String = dateNowMysql()
     Public endTime As String = dateNowMysql()
 
+#Region "Variables and sub by anom EDF for traceability"
+    Public PrintedLongReference as String
+    Public CurrentWorkOrderNumber as String
+    Public WithEvents Traceability as MesMachine 
+    sub ShowTraceabilityError(ByVal message As String)
+        tb_TraceabilityMessage.Text = DateTime.Now.ToString("f")+" : "+message
+    End sub
+#End Region
+    sub MesExceptionEvent(ByVal info As string) Handles Traceability.MesExceptionEvent
+        ShowTraceabilityError(info)
+    End sub
     Sub checkLogin(ByVal user As String, ByVal pass As String)
         Select Case user
             Case "Operator"
@@ -334,7 +346,14 @@ Public Class frmMain
     Private Sub frmMain_Load(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles MyBase.Load
 
         System.Windows.Forms.Control.CheckForIllegalCrossThreadCalls = False
-
+#Region "Initialize Traceability Hook"     
+        Try
+            Traceability = New MesMachine()
+            Traceability.InitializeMachine
+        Catch ex As Exception
+            ShowTraceabilityError(ex.Message)
+        End Try
+#End Region
         definePLC()
 
         writePLC(0, 0)
@@ -380,6 +399,9 @@ Public Class frmMain
         End If
 
         gLabel = New LabelManager2.Application
+
+
+
 
     End Sub
 
@@ -563,6 +585,7 @@ Public Class frmMain
         gDocGroup.VertPrintOffset = readDataBase("SELECT * FROM tblSetCodeSoft WHERE template = '" & Replace(varTemplate, " - new is", "") & "'", "vertical") '0 'txtVerticalOffset.Value
 
         setValueCodesoft()
+        
 
     End Sub
 
@@ -915,7 +938,7 @@ Public Class frmMain
                 Else
                     .FormVariables.Item("ccc_logo").Value = ""
                 End If
-
+ 
             End With
         Catch ex As Exception
             killLPPA()
@@ -936,7 +959,12 @@ Public Class frmMain
         errTemplate = strTemplate
 
         Try
-
+#Region "Read Back Label's Barcode before print by anom EDF for traceability"
+             PrintedLongReference = gDocGroup.Variables.FormVariables.Item("Barcode").Value
+            if Not (Traceability is Nothing) then
+                Traceability.StartProductProcess(CurrentWorkOrderNumber,PrintedLongReference)
+            End If
+#End Region
             gDocGroup.PrintDocument(1)
 
             '            gDocGroup.Close()
@@ -1085,8 +1113,16 @@ Public Class frmMain
                 Else
                     txtPrdQty.Text = scanData
                     lblInstruction.Text = "MASUKKAN PRODUCT KE CONVEYOR!"
-                    insertWO()
+                    insertWO()                   
                 End If
+
+#Region "Traceability Add New WorkOrder "
+                If NOT (Traceability is Nothing) then
+                    IF Not Traceability.WorkOrderIsExist(txtPrdOrder.Text) then
+                        Traceability.NewWorkOrder(txtPrdOrder.Text, txtPrdReference.Text, txtPrdQty.Text)                      
+                    End If
+                End If
+#End Region
             Else
                 lblInstruction.Text = "FORMAT BARCODE QUANTITY SALAH!"
             End If
@@ -1374,6 +1410,11 @@ Public Class frmMain
 
                 dgvTestStatus.Rows.Add("ST2 FAIL", dateNowMysql)
 
+                #Region "Traceability"
+                 'If Not Traceability Is Nothing
+                    'Traceability.UpdateProductStatusNok(PrintedLongReference,"ST2")
+                 'End If
+                #End Region
             Catch ex As Exception
                 MsgBox("recordST2Fail : " & ex.Message)
             End Try
@@ -1427,7 +1468,11 @@ Public Class frmMain
                 dgvTestStatus.Sort(dgvTestStatus.Columns(1), System.ComponentModel.ListSortDirection.Descending)
 
                 dgvTestStatus.Rows.Add("ST4 PASS", dateNowMysql)
-
+                #Region "Traceability"
+                 If Not Traceability Is Nothing
+                    Traceability.UpdateProductStatusOk(PrintedLongReference)
+                 End If
+                #End Region
             Catch ex As Exception
                 MsgBox("recordST4Pass : " & ex.Message)
             End Try
@@ -1445,6 +1490,12 @@ Public Class frmMain
                 dgvTestStatus.Sort(dgvTestStatus.Columns(1), System.ComponentModel.ListSortDirection.Descending)
 
                 dgvTestStatus.Rows.Add("ST4 FAIL", dateNowMysql)
+
+                #Region "Traceability"
+                 If Not Traceability Is Nothing
+                    Traceability.UpdateProductStatusNok(PrintedLongReference,"ST4")
+                 End If
+                #End Region
 
             Catch ex As Exception
                 MsgBox("recordST4Fail : " & ex.Message)
@@ -2050,4 +2101,11 @@ Public Class frmMain
         frmVisionSetting.Show()
     End Sub
 
+    Private Sub txtPrdQty_TextChanged(sender As Object, e As EventArgs) Handles txtPrdQty.TextChanged
+
+    End Sub
+
+    Private Sub tspMenu_ItemClicked(sender As Object, e As ToolStripItemClickedEventArgs) Handles tspMenu.ItemClicked
+
+    End Sub
 End Class
