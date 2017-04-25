@@ -960,7 +960,7 @@ Public Class frmMain
 
         Try
 #Region "Read Back Label's Barcode before print by anom EDF for traceability"
-             PrintedLongReference = gDocGroup.Variables.FormVariables.Item("Barcode").Value
+             PrintedLongReference = gDocGroup.Variables.Formulas.Item("Barcode").Value
             if Not (Traceability is Nothing) then
                 Traceability.StartProductProcess(CurrentWorkOrderNumber,PrintedLongReference)
             End If
